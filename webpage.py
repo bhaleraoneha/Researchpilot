@@ -113,7 +113,10 @@ async function ask(){
   try {
     const r = await fetch('/api/ask', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({question:q, persona:document.getElementById('persona').value})});
-    const data = await r.json();
+    const raw = await r.text();
+    let data;
+    try { data = JSON.parse(raw); }
+    catch (e) { throw new Error('The server did not finish in time or crashed. Server said: ' + raw.slice(0, 200) + ' (please try again)'); }
     if (!r.ok) throw new Error(data.detail || 'Request failed');
     const ans = document.getElementById('answer');
     ans.textContent = data.answer || '(no answer)';

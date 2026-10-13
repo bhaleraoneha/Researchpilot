@@ -53,6 +53,10 @@ failure as case 18 in my evaluation. What I changed (`toolagent/agent.py`, `tool
 The retry logic was tested with simulated failures (recovers on attempt 2 or 3, gives up cleanly after all attempts, does not retry rate-limit errors).
 Retries reduce the problem but cannot remove it, because the model's behaviour is random.
 
+5. **Time budget:** Vercel stops a request after 60 s, which showed up as a plain-text error in the browser. The agent now has a 40 s budget
+   (each model call also has a 20 s timeout); if time runs out it returns a clear message instead of crashing, and the web page shows the
+   server's real error text.
+
 ## Web app and deployment
 `index.py` is a FastAPI app (page + API) that exposes the agent in the browser: you type a question, and the page shows the
 answer plus every step (thought, tool call with input, tool result). The "Evaluation results" tab shows the pass rate.

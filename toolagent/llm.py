@@ -14,4 +14,4 @@ def get_llm(temperature: float = 0, model: str = None):
     if not key or not model:
         raise SystemExit("Set LLM_API_KEY and LLM_MODEL in .env (copy .env.example to .env).")
     return ChatOpenAI(model=model, api_key=key, base_url=os.getenv("LLM_BASE_URL") or None,
-                      temperature=temperature)
+                      temperature=temperature, timeout=20, max_retries=1)

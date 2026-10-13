@@ -66,7 +66,7 @@ def _short(s: str, n: int = 300) -> str:
     return s if len(s) <= n else s[:n] + " ..."
 
 
-def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temperature: float, model) -> dict:
+def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temperature: float, model, deadline: float = None) -> dict:
     """One attempt. Never raises: any failure is returned in result['error']."""
     t0 = time.time()
     trace, calls_by_id, tool_calls = [], {}, []
@@ -114,6 +114,8 @@ def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temper
             last = None
             for state in agent.stream({"messages": messages}, config={"recursion_limit": max_steps * 2 + 1},
                                       stream_mode="values"):
+                if deadline and time.time() > deadline:
+                    raise TimeoutError("TimeBudget: the agent ran out of time")
                 last = state["messages"]
                 process(last, seen)
                 seen = len(last)
@@ -128,7 +130,10 @@ def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temper
             answer = "(The model returned an empty answer. Please try asking again.)"
     except (Exception, SystemExit) as e:  # network error, rate limit, recursion limit ... never crash the caller
         error = f"{type(e).__name__}: {e}"
-        answer = answer or f"(The agent stopped because of an error: {error})"
+        if "TimeBudget" in error:
+            answer = "(The agent ran out of time before finishing. Please ask again; the first request after a quiet period is slower.)"
+        else:
+            answer = answer or f"(The agent stopped because of an error: {error})"
         if verbose:
             print(f"  ⚠️  AGENT ERROR (handled): {error}")
 
@@ -146,14 +151,19 @@ def run_agent(question: str, verbose: bool = True, max_steps: int = 10, persona:
     attempt 1 at temperature 0, attempts 2-3 at higher temperature (different output), and a final attempt
     with LLM_FALLBACK_MODEL if that variable is set. Never raises."""
     t0 = time.time()
+    deadline = t0 + float(os.getenv("AGENT_TIME_BUDGET", "40"))   # must finish before Vercel's 60 s limit
     attempts = [(0.0, None), (0.3, None), (0.6, None)]
     fallback = os.getenv("LLM_FALLBACK_MODEL")
     if fallback:
         attempts.append((0.0, fallback))
     notes = []
     res = None
+    ran = 0
     for n, (temp, model) in enumerate(attempts, 1):
-        res = _run_once(question, verbose, max_steps, persona, temp, model)
+        if n > 1 and time.time() > deadline - 10:      # not enough time left for another full attempt
+            break
+        res = _run_once(question, verbose, max_steps, persona, temp, model, deadline)
+        ran += 1
         err = res["error"] or ""
         if not err or not any(k in err for k in RETRYABLE):
             break
@@ -163,6 +173,6 @@ def run_agent(question: str, verbose: bool = True, max_steps: int = 10, persona:
                 print(f"  🔁 {notes[-1]}")
     if notes and res["error"] is None:
         res["trace"] = [{"kind": "thought", "text": n_} for n_ in notes] + res["trace"]
-    res["attempts"] = n
+    res["attempts"] = ran
     res["seconds"] = round(time.time() - t0, 2)
     return res

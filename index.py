@@ -7,13 +7,19 @@ import os
 import time
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from toolagent.agent import run_agent
 from webpage import HTML
 
 app = FastAPI(title="ResearchPilot")
+
+
+@app.exception_handler(Exception)
+async def any_error(request, exc):
+    """Never send plain text back to the page: always JSON the page can display."""
+    return JSONResponse(status_code=500, content={"detail": f"Server error: {type(exc).__name__}: {str(exc)[:200]}"})
 
 # Shown on the "Evaluation results" tab if evaluation/results/analyst/summary.md is not in the deployment.
 RESULTS_FALLBACK = """Evaluation of the agent (persona: analyst, model: openai/gpt-oss-120b, 25 test cases, run 12-10-2026)
