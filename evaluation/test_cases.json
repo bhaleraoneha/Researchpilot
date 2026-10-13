@@ -1,0 +1,298 @@
+[
+ {
+  "id": 1,
+  "category": "no_tool",
+  "question": "What is the capital of France?",
+  "expected_tools": [],
+  "max_tool_calls": 0,
+  "reference": "Paris. Answered directly without tools.",
+  "must_contain": [
+   "Paris"
+  ]
+ },
+ {
+  "id": 2,
+  "category": "no_tool",
+  "question": "Explain overfitting in machine learning in two sentences.",
+  "expected_tools": [],
+  "max_tool_calls": 0,
+  "reference": "Model learns training data too closely incl. noise, so it does well on training data but poorly on new data. No tool needed.",
+  "must_contain": []
+ },
+ {
+  "id": 3,
+  "category": "no_tool",
+  "question": "What is 12 * 9?",
+  "expected_tools": [],
+  "max_tool_calls": 0,
+  "reference": "108. Easy math, no tool needed.",
+  "must_contain": [
+   "108"
+  ]
+ },
+ {
+  "id": 4,
+  "category": "no_tool",
+  "question": "Translate 'good morning' into Spanish.",
+  "expected_tools": [],
+  "max_tool_calls": 0,
+  "reference": "Buenos d\u00edas. No tool needed.",
+  "must_contain": [
+   "Buenos d"
+  ]
+ },
+ {
+  "id": 5,
+  "category": "no_tool",
+  "question": "Write one sentence defining what a neural network is.",
+  "expected_tools": [],
+  "max_tool_calls": 0,
+  "reference": "A one-sentence definition: a model of connected layers of nodes/neurons that learns patterns from data. No tool needed.",
+  "must_contain": []
+ },
+ {
+  "id": 6,
+  "category": "calculator",
+  "question": "What is 98765432123 * 12345678987?",
+  "expected_tools": [
+   "calculator"
+  ],
+  "max_tool_calls": 2,
+  "reference": "Exactly 1219326320002895899401.",
+  "must_contain": [
+   "1219326320002895899401"
+  ]
+ },
+ {
+  "id": 7,
+  "category": "calculator",
+  "question": "Compute 2 to the power of 100 exactly.",
+  "expected_tools": [
+   "calculator"
+  ],
+  "max_tool_calls": 2,
+  "reference": "Exactly 1267650600228229401496703205376.",
+  "must_contain": [
+   "1267650600228229401496703205376"
+  ]
+ },
+ {
+  "id": 8,
+  "category": "calculator",
+  "question": "What is 123456789 squared?",
+  "expected_tools": [
+   "calculator"
+  ],
+  "max_tool_calls": 2,
+  "reference": "Exactly 15241578750190521.",
+  "must_contain": [
+   "15241578750190521"
+  ]
+ },
+ {
+  "id": 9,
+  "category": "calculator",
+  "question": "What is 987654321 divided by 123, rounded to 4 decimal places?",
+  "expected_tools": [
+   "calculator"
+  ],
+  "max_tool_calls": 2,
+  "reference": "8029709.9268.",
+  "must_contain": [
+   "8029709.9268"
+  ]
+ },
+ {
+  "id": 10,
+  "category": "code",
+  "question": "Run Python to compute the sum of all numbers below 1,000,000 that are divisible by 3 or 5.",
+  "expected_tools": [
+   "python_executor"
+  ],
+  "max_tool_calls": 3,
+  "reference": "233333166668 (obtained by running code).",
+  "must_contain": [
+   "233333166668"
+  ]
+ },
+ {
+  "id": 11,
+  "category": "code",
+  "question": "Use Python to count how many prime numbers are below 100000.",
+  "expected_tools": [
+   "python_executor"
+  ],
+  "max_tool_calls": 3,
+  "reference": "9592 (obtained by running code).",
+  "must_contain": [
+   "9592"
+  ]
+ },
+ {
+  "id": 12,
+  "category": "code",
+  "question": "Use Python to compute the SHA-256 hash of the text 'hello world' and give me the first 16 hex characters.",
+  "expected_tools": [
+   "python_executor"
+  ],
+  "max_tool_calls": 3,
+  "reference": "b94d27b9934d3e08 (obtained by running code).",
+  "must_contain": [
+   "b94d27b9934d3e08"
+  ]
+ },
+ {
+  "id": 13,
+  "category": "search",
+  "question": "Search the web: what is the height of Mount Everest in metres?",
+  "expected_tools": [
+   "web_search"
+  ],
+  "max_tool_calls": 3,
+  "reference": "About 8,848 m (8,848.86 m is the official 2020 figure). Must come from search results.",
+  "must_contain": []
+ },
+ {
+  "id": 14,
+  "category": "search",
+  "question": "Search the web for the latest stable release of Python and tell me its version number.",
+  "expected_tools": [
+   "web_search"
+  ],
+  "max_tool_calls": 3,
+  "reference": "A specific, plausible latest stable Python 3.x version (3.13 or newer), supported by the search results.",
+  "must_contain": []
+ },
+ {
+  "id": 15,
+  "category": "search",
+  "question": "Who is the current CEO of Microsoft? Check the web.",
+  "expected_tools": [
+   "web_search"
+  ],
+  "max_tool_calls": 3,
+  "reference": "Satya Nadella (unless search results clearly show a change). Must be supported by search results.",
+  "must_contain": []
+ },
+ {
+  "id": 16,
+  "category": "multi_step",
+  "question": "Search the web for the height of Mount Everest in metres, then use the calculator to convert it to feet (multiply by 3.28084).",
+  "expected_tools": [
+   "web_search",
+   "calculator"
+  ],
+  "max_tool_calls": 4,
+  "reference": "About 29,030 feet (8,848.86 m x 3.28084 = 29,031.7 ft; 8,848 m gives 29,029). Must use search result then calculator.",
+  "must_contain": []
+ },
+ {
+  "id": 17,
+  "category": "multi_step",
+  "question": "Search for the average distance from Earth to the Moon in kilometres, then use the calculator to work out how many seconds light takes to travel that distance at 299792 km/s.",
+  "expected_tools": [
+   "web_search",
+   "calculator"
+  ],
+  "max_tool_calls": 4,
+  "reference": "About 1.28 seconds (384,400 km / 299,792 km/s = 1.282 s). Accept 1.25 to 1.30.",
+  "must_contain": []
+ },
+ {
+  "id": 18,
+  "category": "multi_step",
+  "question": "Search for the current population of Japan, then use the calculator to find 1% of it.",
+  "expected_tools": [
+   "web_search",
+   "calculator"
+  ],
+  "max_tool_calls": 4,
+  "reference": "Japan has about 123-125 million people, so 1% is roughly 1.2 to 1.25 million. Must be consistent with the population found.",
+  "must_contain": []
+ },
+ {
+  "id": 19,
+  "category": "multi_step",
+  "question": "Use Python to compute the sum of squares of the integers 1 to 1000, then use the calculator to divide that sum by 7 and report the result.",
+  "expected_tools": [
+   "python_executor",
+   "calculator"
+  ],
+  "max_tool_calls": 4,
+  "reference": "Sum of squares is 333833500; divided by 7 is 47690500.",
+  "must_contain": [
+   "333833500",
+   "47690500"
+  ]
+ },
+ {
+  "id": 20,
+  "category": "multi_step",
+  "question": "Calculate 15% of 8,450, then add 2,375 to it, then multiply the total by 12. Use the calculator.",
+  "expected_tools": [
+   "calculator"
+  ],
+  "max_tool_calls": 4,
+  "reference": "15% of 8450 = 1267.5; plus 2375 = 3642.5; times 12 = 43710.",
+  "must_contain": [
+   "43710"
+  ]
+ },
+ {
+  "id": 21,
+  "category": "failure",
+  "question": "Calculate 10 / 0.",
+  "expected_tools": [
+   "calculator"
+  ],
+  "max_tool_calls": 3,
+  "reference": "Must say division by zero is undefined / not possible. Must NOT invent a numeric result, and must not crash.",
+  "must_contain": []
+ },
+ {
+  "id": 22,
+  "category": "failure",
+  "question": "Search the web for 'qzxv wlmrtp blorf 99172 zzkq' and tell me what it is.",
+  "expected_tools": [
+   "web_search"
+  ],
+  "max_tool_calls": 4,
+  "reference": "Must honestly say nothing useful was found (or that it is gibberish). Must NOT invent a made-up explanation.",
+  "must_contain": []
+ },
+ {
+  "id": 23,
+  "category": "failure",
+  "question": "Run this Python code and tell me the output: print(1/0)",
+  "expected_tools": [
+   "python_executor"
+  ],
+  "max_tool_calls": 3,
+  "reference": "Must report that the code raised a ZeroDivisionError (division by zero) instead of crashing or inventing output.",
+  "must_contain": []
+ },
+ {
+  "id": 24,
+  "category": "brief",
+  "question": "Look up the population of India, calculate what 5% of it is, then write a 3-sentence summary of your findings.",
+  "expected_tools": [
+   "web_search",
+   "calculator"
+  ],
+  "max_tool_calls": 4,
+  "reference": "India has roughly 1.4 to 1.45 billion people, so 5% is roughly 70 to 73 million. The final summary must be about 3 sentences and consistent with the population figure found.",
+  "must_contain": []
+ },
+ {
+  "id": 25,
+  "category": "brief",
+  "question": "Search the web for the current gold price per troy ounce in USD, then use the calculator to work out the cost of 25 grams (1 troy ounce = 31.1035 grams), and write a 2-sentence summary.",
+  "expected_tools": [
+   "web_search",
+   "calculator"
+  ],
+  "max_tool_calls": 4,
+  "reference": "Cost of 25 g = price per ounce x 25 / 31.1035. The arithmetic must be correct for the price found by search, and the summary should be about 2 sentences.",
+  "must_contain": []
+ }
+]
