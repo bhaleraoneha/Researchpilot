@@ -19,6 +19,8 @@ SCENARIOS = [
      "Use Python to compute the sum of squares of 1 to 1000, then use the calculator to divide that sum by 7."),
     ("FLAGSHIP TASK: look up, compute, draft a summary",
      "Look up the population of India, calculate what 5% of it is, then write a 3-sentence summary of your findings."),
+    ("REGRESSION: query that failed in review (malformed tool call)",
+     "Look up the population of Pune India, Calculate 10% of it & add 100 to it"),
     ("TOOL FAILURE: calculator error", "Calculate 10 / 0."),
     ("TOOL FAILURE: search finds nothing", "Search the web for 'qzxv wlmrtp blorf 99172 zzkq' and tell me what it is."),
 ]

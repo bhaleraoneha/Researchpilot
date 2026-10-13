@@ -13,7 +13,10 @@ Tool rules:
 3. BEFORE every tool call, write ONE short sentence starting with "Thought:" saying why you need that tool.
 4. If a tool returns ERROR or NO_RESULTS, do not give up immediately: fix your input or rephrase and try once more.
    If it still fails, tell the user honestly what went wrong. Never invent a tool result.
-5. For multi-step tasks, use the result of one tool as input to the next, then give a short final answer."""
+5. For multi-step tasks, use the result of one tool as input to the next, then give a short final answer.
+6. Each tool takes exactly ONE text argument: calculator(expression), python_executor(code), web_search(query).
+   Never pass other arguments such as id, cursor or url. To learn more, call web_search again with a new, more specific query.
+   Do the steps in order: finish the search first, then use its numbers in the calculator."""
 
 BASELINE = "You are a careful assistant.\n\n" + TOOL_RULES
 
