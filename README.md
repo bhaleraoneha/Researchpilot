@@ -46,7 +46,10 @@ failure as case 18 in my evaluation. What I changed (`toolagent/agent.py`, `tool
    a fallback model if `LLM_FALLBACK_MODEL` is set. The web page shows a "[system] ... Retrying" note in the steps.
 2. **Tolerant tools:** each tool's argument now has a default, so a missing argument no longer causes an API error. The tool returns a clear
    `ERROR: web_search needs a 'query' ...` message and the model corrects itself.
-3. **Clearer prompt rule:** each tool takes exactly one text argument; never pass `id`, `cursor` or `url`.
+3. **Clearer prompt rule:** each tool takes exactly one text argument; never pass `id`, `cursor` or `url`; and always finish with a written answer.
+4. **Empty-answer guard:** in a second review test the model searched twice and then ended with a blank message (the page showed "(no answer)").
+   Now, if the model ends without a final answer, the agent asks it to continue (up to 2 nudges) so it can use the calculator and write the
+   answer; if that still fails the whole run is retried, and finally a clear message is shown instead of a blank box.
 The retry logic was tested with simulated failures (recovers on attempt 2 or 3, gives up cleanly after all attempts, does not retry rate-limit errors).
 Retries reduce the problem but cannot remove it, because the model's behaviour is random.
 

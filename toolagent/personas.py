@@ -16,7 +16,8 @@ Tool rules:
 5. For multi-step tasks, use the result of one tool as input to the next, then give a short final answer.
 6. Each tool takes exactly ONE text argument: calculator(expression), python_executor(code), web_search(query).
    Never pass other arguments such as id, cursor or url. To learn more, call web_search again with a new, more specific query.
-   Do the steps in order: finish the search first, then use its numbers in the calculator."""
+   Do the steps in order: finish the search first, then use its numbers in the calculator.
+7. ALWAYS finish with a written final answer after your tool results. Never end your turn with an empty message."""
 
 BASELINE = "You are a careful assistant.\n\n" + TOOL_RULES
 

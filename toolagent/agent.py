@@ -79,34 +79,53 @@ def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temper
                     "final": "✅ FINAL ANSWER"}[kind]
             print(f"  {icon}: {_short(text, 400)}")
 
-    try:
-        stream = get_agent(persona, temperature, model).stream({"messages": [{"role": "user", "content": question}]},
-                                    config={"recursion_limit": max_steps * 2 + 1},
-                                    stream_mode="values")
-        for state in stream:
-            msgs = state["messages"]
-            for msg in msgs[seen:]:
-                kind = getattr(msg, "type", "")
-                if kind == "ai":
-                    text = _text(msg.content).strip()
-                    calls = getattr(msg, "tool_calls", None) or []
-                    if text and calls:
-                        log("thought", text)
-                    for c in calls:
-                        rec = {"name": c["name"], "args": c["args"], "result": None}
-                        calls_by_id[c["id"]] = rec
-                        tool_calls.append(rec)
-                        log("call", f"{c['name']}({c['args']})")
-                    if not calls:
-                        answer = text
+    def process(msgs, start):
+        """Log every message after index `start`; remember the final answer."""
+        nonlocal answer
+        for msg in msgs[start:]:
+            kind = getattr(msg, "type", "")
+            if kind == "ai":
+                text = _text(msg.content).strip()
+                calls = getattr(msg, "tool_calls", None) or []
+                if text and calls:
+                    log("thought", text)
+                for c in calls:
+                    rec = {"name": c["name"], "args": c["args"], "result": None}
+                    calls_by_id[c["id"]] = rec
+                    tool_calls.append(rec)
+                    log("call", f"{c['name']}({c['args']})")
+                if not calls:
+                    answer = text
+                    if text:
                         log("final", text)
-                elif kind == "tool":
-                    result = _text(msg.content)
-                    rec = calls_by_id.get(getattr(msg, "tool_call_id", None))
-                    if rec is not None:
-                        rec["result"] = result
-                    log("result", result)
-            seen = len(msgs)
+            elif kind == "tool":
+                result = _text(msg.content)
+                rec = calls_by_id.get(getattr(msg, "tool_call_id", None))
+                if rec is not None:
+                    rec["result"] = result
+                log("result", result)
+
+    nudge_text = ("You stopped without writing a final answer. Continue now: if a step is still missing "
+                  "(for example the calculator), call that tool, then write the final answer in text.")
+    try:
+        agent = get_agent(persona, temperature, model)
+        messages = [{"role": "user", "content": question}]
+        for round_no in range(3):            # round 0 = normal run; rounds 1-2 = "please finish" nudges
+            last = None
+            for state in agent.stream({"messages": messages}, config={"recursion_limit": max_steps * 2 + 1},
+                                      stream_mode="values"):
+                last = state["messages"]
+                process(last, seen)
+                seen = len(last)
+            if answer.strip() or last is None:
+                break
+            if round_no < 2:                 # the model ended with an EMPTY message: ask it to continue
+                log("thought", "[system] The model ended without a final answer. Asking it to continue.")
+                messages = list(last) + [{"role": "user", "content": nudge_text}]
+                seen = len(last)
+        if not answer.strip():
+            error = "EmptyAnswer: the model returned no final text"
+            answer = "(The model returned an empty answer. Please try asking again.)"
     except (Exception, SystemExit) as e:  # network error, rate limit, recursion limit ... never crash the caller
         error = f"{type(e).__name__}: {e}"
         answer = answer or f"(The agent stopped because of an error: {error})"
@@ -118,8 +137,8 @@ def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temper
             "seconds": round(time.time() - t0, 2)}
 
 
-# Errors where the MODEL (not our code) produced an invalid tool call. A fresh attempt usually works.
-RETRYABLE = ("tool_use_failed", "Tool call validation failed", "Failed to call a function", "failed_generation")
+# Errors where the MODEL (not our code) misbehaved: invalid tool call or an empty final message. A fresh attempt usually works.
+RETRYABLE = ("tool_use_failed", "Tool call validation failed", "Failed to call a function", "failed_generation", "EmptyAnswer")
 
 
 def run_agent(question: str, verbose: bool = True, max_steps: int = 10, persona: str = "analyst") -> dict:
@@ -139,7 +158,7 @@ def run_agent(question: str, verbose: bool = True, max_steps: int = 10, persona:
         if not err or not any(k in err for k in RETRYABLE):
             break
         if n < len(attempts):
-            notes.append(f"[system] Attempt {n} failed because the model sent an invalid tool call. Retrying automatically (attempt {n + 1}).")
+            notes.append(f"[system] Attempt {n} failed because the model sent an invalid tool call or an empty answer. Retrying automatically (attempt {n + 1}).")
             if verbose:
                 print(f"  🔁 {notes[-1]}")
     if notes and res["error"] is None:
