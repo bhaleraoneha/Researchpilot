@@ -57,6 +57,11 @@ Retries reduce the problem but cannot remove it, because the model's behaviour i
    (each model call also has a 20 s timeout); if time runs out it returns a clear message instead of crashing, and the web page shows the
    server's real error text.
 
+6. **Token limit (Groq free plan = 8,000 tokens per minute per model):** one run with 7 tool calls exceeded it and returned a 429 error.
+   Fixes: search results are cut to 3 short results, the prompts are shorter, the prompt allows at most 2 searches, each model call is limited to
+   1,000 output tokens, and when Groq answers 429 the agent automatically switches to a backup model (`openai/gpt-oss-20b`, or the models in
+   `LLM_FALLBACK_MODEL`), because Groq counts the limit per model. If both are busy, a friendly "wait a minute" message is shown.
+
 ## Web app and deployment
 `index.py` is a FastAPI app (page + API) that exposes the agent in the browser: you type a question, and the page shows the
 answer plus every step (thought, tool call with input, tool result). The "Evaluation results" tab shows the pass rate.
@@ -132,6 +137,7 @@ Full analysis: `reports/RESULTS.md`.
 - The agent has no memory between questions, and no tools for email, files or databases.
 - The evaluation numbers above (22/25) were measured BEFORE the code-runner "safe mode" and the retry/tolerant-tool fixes were added, so the current app may score differently.
 - On Vercel, DuckDuckGo search may be blocked or rate-limited more often than on a home computer; the agent then reports that search failed.
+- The free Groq plan limits tokens per minute (8,000 for openai/gpt-oss-120b), shared by everyone using the app. The agent switches to a backup model when one is full, but if several people ask questions in the same minute, some requests may still be told to wait about a minute.
 - The model sometimes produces an invalid tool call, which the API rejects. The app now retries automatically (up to 3 times), but if every attempt fails the run ends with an error message.
 - The LLM judge only sees the first 300 characters of each tool output, so it can wrongly fail a correct answer.
 - Each test case requires specific tools, which can fail a correct answer that did not need a tool (case 21).

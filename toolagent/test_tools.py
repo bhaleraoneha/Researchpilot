@@ -24,6 +24,21 @@ def test_python_executor():
     assert "printed nothing" in T.run_python("x = 1")
 
 
+def test_safe_mode_blocks_dangerous_code():
+    assert "blocked for safety" in T.run_python("import os\nprint(os.environ)")
+    assert "blocked for safety" in T.run_python("print(open('x').read())")
+    assert "blocked for safety" in T.run_python("print(().__class__)")
+    assert "blocked for safety" in T.run_python("import subprocess")
+    assert T.run_python("import math\nprint(math.sqrt(16))") == "4.0"
+    assert T.run_python("import hashlib\nprint(hashlib.sha256(b'hello world').hexdigest()[:16])") == "b94d27b9934d3e08"
+
+
+def test_search_results_are_short():
+    hits = [{"title": "T" * 500, "body": "B" * 5000, "href": "https://x.com/" + "h" * 500}] * 3
+    out = T._format_hits(hits)
+    assert len(out) < 1600, len(out)
+
+
 def test_search_never_raises():
     assert isinstance(T.web_search("python latest version"), str)  # results, NO_RESULTS or ERROR
 

@@ -96,7 +96,7 @@ def ask(body: Ask):
     if _limited():
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a minute and try again.")
     persona = body.persona if body.persona in ("analyst", "baseline") else "analyst"
-    res = run_agent(question, verbose=False, max_steps=8, persona=persona)
+    res = run_agent(question, verbose=False, max_steps=6, persona=persona)
     trace = [{"kind": t["kind"], "text": t["text"][:700]} for t in res["trace"]]
     return {"answer": res["answer"], "n_tool_calls": res["n_tool_calls"], "trace": trace,
-            "error": res["error"], "seconds": res["seconds"], "persona": persona}
+            "error": (res["error"] or "")[:200] or None, "seconds": res["seconds"], "persona": persona}

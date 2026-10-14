@@ -78,17 +78,56 @@ def calculate(expression: str) -> str:
 
 # ----------------------------------------------------------------------------------------------
 # 2) Python executor: actually runs code in a separate process with a time limit.
-#    (A subprocess + timeout is fine for a learning project, but it is NOT a security sandbox.)
+#    SAFE MODE (default ON, needed because the app is public): the code is checked first and may only
+#    import harmless modules (math, hashlib, itertools ...). No files, network, os/sys or dunder tricks.
+#    The child process also gets NO secret environment variables (API keys). This reduces risk but it is
+#    still NOT a perfect sandbox. Set PY_SAFE_MODE=0 to turn the checks off for local experiments.
 # ----------------------------------------------------------------------------------------------
+_ALLOWED_IMPORTS = {"math", "itertools", "functools", "collections", "statistics", "hashlib", "random", "re",
+                    "string", "decimal", "fractions", "datetime", "json", "heapq", "bisect", "operator",
+                    "typing", "array", "base64", "textwrap", "numbers", "cmath"}
+_BLOCKED_NAMES = {"open", "exec", "eval", "compile", "__import__", "input", "breakpoint", "globals", "locals",
+                  "vars", "getattr", "setattr", "delattr", "memoryview", "exit", "quit", "help"}
+
+
+def _check_code(code: str) -> None:
+    """Raise ValueError if the code uses anything outside the small safe subset."""
+    tree = ast.parse(code)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name.split(".")[0] not in _ALLOWED_IMPORTS:
+                    raise ValueError(f"import of '{a.name}' is not allowed")
+        elif isinstance(node, ast.ImportFrom):
+            if node.level or (node.module or "").split(".")[0] not in _ALLOWED_IMPORTS:
+                raise ValueError(f"import from '{node.module}' is not allowed")
+        elif isinstance(node, ast.Name) and node.id in _BLOCKED_NAMES:
+            raise ValueError(f"'{node.id}' is not allowed")
+        elif isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+            raise ValueError("attribute names starting with '__' are not allowed")
+
+
+def _clean_env() -> dict:
+    bad = ("KEY", "TOKEN", "SECRET", "PASSWORD", "LLM_", "AWS_", "VERCEL")
+    return {k: v for k, v in os.environ.items() if not any(b in k.upper() for b in bad)}
+
+
 def run_python(code: str, timeout: int = 10) -> str:
     """Run Python code and return what it printed (stdout), or 'ERROR: ...'."""
     path = None
     try:
+        if os.getenv("PY_SAFE_MODE", "1") != "0":
+            try:
+                _check_code(code)
+            except SyntaxError as e:
+                return f"ERROR: SyntaxError: {e.msg} (line {e.lineno})"
+            except ValueError as e:
+                return f"ERROR: blocked for safety: {e}. Only simple computations with modules like math, hashlib, itertools are allowed."
         with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
             f.write(code)
             path = f.name
         proc = subprocess.run([sys.executable, "-I", path], capture_output=True, text=True,
-                              timeout=timeout, cwd=tempfile.gettempdir())
+                              timeout=timeout, cwd=tempfile.gettempdir(), env=_clean_env())
         out = (proc.stdout or "").strip()
         if proc.returncode != 0:
             err = (proc.stderr or "").strip()[-1500:]
@@ -108,8 +147,38 @@ def run_python(code: str, timeout: int = 10) -> str:
 # ----------------------------------------------------------------------------------------------
 # 3) Web search: real-time information via DuckDuckGo (no API key needed).
 # ----------------------------------------------------------------------------------------------
-def web_search(query: str, max_results: int = 5) -> str:
+def _tavily(query: str, max_results: int):
+    """Optional: used only if TAVILY_API_KEY is set (more reliable than DuckDuckGo on cloud servers)."""
+    key = os.getenv("TAVILY_API_KEY")
+    if not key:
+        return None
+    import json
+    import urllib.request
+    req = urllib.request.Request(
+        "https://api.tavily.com/search",
+        data=json.dumps({"query": query, "max_results": max_results}).encode(),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        data = json.load(r)
+    return [{"title": h.get("title", ""), "body": h.get("content", ""), "href": h.get("url", "")}
+            for h in data.get("results", [])]
+
+
+def _format_hits(hits) -> str:
+    """Short on purpose: long results burn the model's tokens-per-minute limit on free plans."""
+    cut = lambda text, n: (text or "").replace("\n", " ").strip()[:n]
+    return "\n".join(f"{i}. {cut(h.get('title'), 100)}\n   {cut(h.get('body'), 280)}\n   {cut(h.get('href'), 90)}"
+                     for i, h in enumerate(hits, 1))
+
+
+def web_search(query: str, max_results: int = 3) -> str:
     """Search the web. Returns numbered results, 'NO_RESULTS ...' or 'ERROR: ...'."""
+    try:
+        hits = _tavily(query, max_results)
+        if hits:
+            return _format_hits(hits)
+    except Exception:
+        pass  # fall back to DuckDuckGo below
     try:
         try:
             from ddgs import DDGS
@@ -123,7 +192,4 @@ def web_search(query: str, max_results: int = 5) -> str:
         return f"ERROR: search failed ({type(e).__name__}: {e})"
     if not hits:
         return f"NO_RESULTS for query {query!r}. Try rephrasing the query."
-    lines = []
-    for i, h in enumerate(hits, 1):
-        lines.append(f"{i}. {h.get('title', '')}\n   {h.get('body', '')}\n   {h.get('href', '')}")
-    return "\n".join(lines)
+    return _format_hits(hits)

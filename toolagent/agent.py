@@ -130,7 +130,10 @@ def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temper
             answer = "(The model returned an empty answer. Please try asking again.)"
     except (Exception, SystemExit) as e:  # network error, rate limit, recursion limit ... never crash the caller
         error = f"{type(e).__name__}: {e}"
-        if "TimeBudget" in error:
+        if "RateLimit" in error or "rate_limit" in error or "Error code: 429" in error:
+            error = "RateLimitError: the free AI service is busy (tokens per minute limit)"
+            answer = "(The free AI service is busy right now (rate limit reached). Please wait about one minute and ask again.)"
+        elif "TimeBudget" in error:
             answer = "(The agent ran out of time before finishing. Please ask again; the first request after a quiet period is slower.)"
         else:
             answer = answer or f"(The agent stopped because of an error: {error})"
@@ -146,31 +149,41 @@ def _run_once(question: str, verbose: bool, max_steps: int, persona: str, temper
 RETRYABLE = ("tool_use_failed", "Tool call validation failed", "Failed to call a function", "failed_generation", "EmptyAnswer")
 
 
+def _is_rate_limit(err: str) -> bool:
+    return "RateLimitError" in err or "rate_limit" in err or "Error code: 429" in err
+
+
 def run_agent(question: str, verbose: bool = True, max_steps: int = 10, persona: str = "analyst") -> dict:
-    """Run the agent. If the model sends a malformed tool call (HTTP 400 from the API), retry automatically:
-    attempt 1 at temperature 0, attempts 2-3 at higher temperature (different output), and a final attempt
-    with LLM_FALLBACK_MODEL if that variable is set. Never raises."""
+    """Run the agent. Never raises. It protects itself against three kinds of trouble:
+      * the model sends a malformed tool call / empty answer -> repeat the run (temperature 0, 0.3, 0.6)
+      * the model's free tokens-per-minute limit is full (HTTP 429) -> switch to a backup model, which has its own quota
+        (LLM_FALLBACK_MODEL, comma separated; default openai/gpt-oss-20b)
+      * too slow -> a 40 s time budget (AGENT_TIME_BUDGET) so the web host does not cut the request off."""
     t0 = time.time()
-    deadline = t0 + float(os.getenv("AGENT_TIME_BUDGET", "40"))   # must finish before Vercel's 60 s limit
-    attempts = [(0.0, None), (0.3, None), (0.6, None)]
-    fallback = os.getenv("LLM_FALLBACK_MODEL")
-    if fallback:
-        attempts.append((0.0, fallback))
-    notes = []
-    res = None
-    ran = 0
-    for n, (temp, model) in enumerate(attempts, 1):
-        if n > 1 and time.time() > deadline - 10:      # not enough time left for another full attempt
+    deadline = t0 + float(os.getenv("AGENT_TIME_BUDGET", "40"))
+    primary = os.getenv("LLM_MODEL")
+    fallbacks = [m.strip() for m in (os.getenv("LLM_FALLBACK_MODEL") or "openai/gpt-oss-20b").split(",")
+                 if m.strip() and m.strip() != primary]
+    temps, ti, model = [0.0, 0.3, 0.6], 0, None
+    notes, res, ran = [], None, 0
+    while True:
+        if ran > 0 and time.time() > deadline - 10:      # not enough time left for another full attempt
             break
-        res = _run_once(question, verbose, max_steps, persona, temp, model, deadline)
+        res = _run_once(question, verbose, max_steps, persona, temps[ti], model, deadline)
         ran += 1
         err = res["error"] or ""
-        if not err or not any(k in err for k in RETRYABLE):
+        if not err:
             break
-        if n < len(attempts):
-            notes.append(f"[system] Attempt {n} failed because the model sent an invalid tool call or an empty answer. Retrying automatically (attempt {n + 1}).")
-            if verbose:
-                print(f"  🔁 {notes[-1]}")
+        if _is_rate_limit(err) and fallbacks:
+            model = fallbacks.pop(0)
+            notes.append(f"[system] The AI service was busy (rate limit). Switching to backup model {model} and retrying.")
+        elif any(k in err for k in RETRYABLE) and ti < len(temps) - 1:
+            ti += 1
+            notes.append(f"[system] Attempt {ran} failed because the model sent an invalid tool call or an empty answer. Retrying automatically.")
+        else:
+            break
+        if verbose:
+            print(f"  🔁 {notes[-1]}")
     if notes and res["error"] is None:
         res["trace"] = [{"kind": "thought", "text": n_} for n_ in notes] + res["trace"]
     res["attempts"] = ran
